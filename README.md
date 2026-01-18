@@ -21,7 +21,7 @@ Update of our funky friend elohmeier python script "wefunk-cue-grabber" to creat
 Cue file generate is ideal for single file in mp3 format.
 Cue files can be processed in superior players like (https://www.foobar2000.org).
 
-or split with mp3splt
+or split with mp3splt, personaly havent tried it...
 ```
 for f in $(find -name "*.mp3")
 do
