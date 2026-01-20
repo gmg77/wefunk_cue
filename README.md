@@ -10,8 +10,13 @@ Update of our funky friend elohmeier python script "wefunk-cue-grabber" to creat
 - mp3 files from wefunk.com optional but highly recommended
 
 ## Quick Start
-- ```pip install lxml```
-- ```python wefunkcue.py``` without arguments, it will ask for input interactively!
+```
+pip install lxml
+```
+```
+python wefunkcue.py
+```
+without arguments, it will ask for input interactively!
 - Simple Mode (Single Show): ```python wefunkcue.py 1234```
 - Range Mode (Multiple Shows): ```python wefunkcue.py --start 1230 --end 1234```
   
