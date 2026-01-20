@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
 '''
-WEFUNK RADIO CUE SHEET GENERATOR
+WEFUNK RADIO CUE SHEET GENERATOR (FIXED v3)
 Usage: 
-  python wefunkcue.py 1234            (Download specific show)
+  python wefunkcue.py 386            (Download specific show)
   python wefunkcue.py --start 1 --end 10 (Download range)
 '''
 
@@ -147,7 +147,8 @@ class Client:
             else:
                 track_data = []
 
-            pl_divs = tree.xpath('//ul[@class="playlistregular"]//div[@class="content"]//div')
+            # Select the list items (li)
+            pl_items = tree.xpath('//ul[@class="playlistregular"]/li')
             
             track_list = []
             
@@ -157,30 +158,67 @@ class Client:
                 if 'mspos' not in track_data[i]: continue
                 mspos = timedelta(milliseconds=track_data[i]['mspos'])
                 
+                # --- Get Visual Text ---
+                visual_text = ""
+                visual_html = ""
+                if i < len(pl_items):
+                    content_divs = pl_items[i].xpath('.//div[@class="content"]')
+                    if content_divs:
+                        visual_text = content_divs[0].text_content().strip()
+                        visual_html = html.tostring(content_divs[0]).decode('utf-8', errors='ignore')
+                
+                # Clean up multiple spaces/newlines in visual text
+                visual_text = re.sub(r'\s+', ' ', visual_text) 
+                
                 if i == 0:
                     track_list.append(Track(1, "WEFUNK RADIO", "intro", mspos))
                 else:
-                    artist = ''
-                    title = ''
+                    json_artist = ''
+                    json_title = ''
                     
-                    # Handle nested list structure [[{'t':...}], ...] vs dict
+                    # 1. Get JSON Metadata
                     if isinstance(item_container, list) and len(item_container) > 0:
                         info = item_container[0]
-                        artist = info.get('a', '')
-                        title = info.get('t', '')
+                        json_artist = info.get('a', '')
+                        json_title = info.get('t', '')
                     elif isinstance(item_container, dict):
-                         artist = item_container.get('a', '')
-                         title = item_container.get('t', '')
+                         json_artist = item_container.get('a', '')
+                         json_title = item_container.get('t', '')
                     
-                    # Detect talkover
-                    is_talk = False
-                    if i < len(pl_divs):
-                        div_html = html.tostring(pl_divs[i]).decode('utf-8', errors='ignore')
-                        if "<strong>talk</strong>" in div_html:
-                            is_talk = True
+                    if json_artist: json_artist = json_artist.strip()
+                    if json_title: json_title = json_title.strip()
+
+                    # 2. Heuristics
+                    is_talk_tag = "<strong>talk</strong>" in visual_html
+                    is_interview_text = "interview" in visual_text.lower()
                     
-                    final_title = f"talk (over {artist} - {title})" if is_talk else title
-                    track_list.append(Track(i + 1, "WEFUNK RADIO" if is_talk else artist, final_title, mspos))
+                    # 3. Determine Final Artist/Title
+                    
+                    # PRIORITY 1: If it's an interview, FORCE usage of Visual Text
+                    # (This overrides JSON even if JSON exists, fixing Show #386)
+                    if is_interview_text:
+                        final_artist = "WEFUNK RADIO"
+                        final_title = visual_text
+                    
+                    # PRIORITY 2: If JSON data is missing, fallback to Visual Text
+                    elif not json_artist and not json_title:
+                        final_artist = "WEFUNK RADIO"
+                        final_title = visual_text if visual_text else "Unknown"
+                        
+                    # PRIORITY 3: Standard Song (JSON data exists and not an interview)
+                    else:
+                        final_artist = json_artist
+                        final_title = json_title
+                        
+                        # Handle Talkover tag for standard songs
+                        if is_talk_tag:
+                            if final_title and final_title != "Unknown" and final_title != visual_text:
+                                final_title = f"talk (over {final_artist} - {final_title})"
+                            else:
+                                final_title = "talk"
+                            final_artist = "WEFUNK RADIO"
+
+                    track_list.append(Track(i + 1, final_artist, final_title, mspos))
             
             return track_list
         except Exception as e:
